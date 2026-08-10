@@ -1,56 +1,66 @@
-# Welcome to your Expo app 👋
+# MealDiary 🍽️
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A private, local-first food diary for your phone. Take a photo of a meal, get a quick AI estimate of calories and macros, fix anything that looks wrong, and track your day against your goals.
 
-## Get started
+**No account. No cloud. No backend.** Everything (diary, profile, goals, settings, photos) lives only on this device. The only network call in the whole app is the optional photo analysis — and that goes straight to the AI provider you configure with **your own API key**. If no key is set, the app works fine as a manual food diary.
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run it in Expo Go (fastest way to test)
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Then scan the QR code with the **Expo Go** app on your phone (Android or iOS). Your phone and computer must be on the same network. No native build needed — everything used here works inside Expo Go.
 
-### Other setup steps
+You can also press `a` (Android emulator), `i` (iOS simulator), or `w` (web) from the terminal.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## What you can do
 
-## Learn more
+- **Scan a meal** — take a photo or pick one from your library, get calories/protein/carbs/fat estimated, then edit anything before saving.
+- **Manual diary** — search ~130 built-in common foods or enter a custom entry with your own numbers. Works fully offline.
+- **Daily totals** — calories with a progress ring vs. your target, plus protein/carbs/fat bars.
+- **Goals** — set them manually, or compute them from your profile (Mifflin-St Jeor BMR × activity × goal).
+- **History** — browse the last 30 days, tap a day to see its meals, and a 7-day calorie chart.
+- **Edit / delete** — every entry can be edited or deleted; settings include **Delete all data on this device**.
 
-To learn more about developing your project with Expo, look at the following resources:
+## Setting up AI photo analysis
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+1. Open **Settings → AI photo analysis**.
+2. Pick a provider:
+   - **OpenAI** — paste an `sk-...` key (default model `gpt-4o-mini`).
+   - **Custom (OpenAI-compatible)** — any service with a `/chat/completions` API: OpenRouter, Groq, Together, local endpoints, etc. Set the base URL and model.
+   - **Google Gemini** — paste an `AIza...` key (default model `gemini-2.5-flash`).
+3. Tap **Test connection** to verify, then **Save**.
 
-## Join the community
+Your key is stored in the device's secure storage (SecureStore) and is only sent to the provider you configured, as an `Authorization` header or Gemini query param. It never leaves your phone otherwise.
 
-Join our community of developers creating universal apps.
+## Privacy & data
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Diary, profile, goals and AI settings are stored with AsyncStorage; the API key in SecureStore; meal photos in the app's documents folder.
+- There is no telemetry, no analytics SDK, no network calls other than the AI analysis request you trigger.
+- **Settings → Delete all data on this device** wipes everything including your API key and saved photos.
+
+## Project structure
+
+```
+src/
+  app/            Routes (expo-router)
+    (tabs)/       Today · History · Settings
+    scan.tsx      Photo capture → AI estimate
+    add.tsx       Manual entry (food search)
+    entry-edit.tsx  Shared editor for new/edited entries
+  components/     Small UI kit (cards, fields, segmented, bars)
+  lib/
+    storage.ts    Local persistence + app state hook
+    ai.ts         OpenAI-compatible + Gemini clients (photo → JSON estimate)
+    nutrition.ts  BMR / target calculations, totals
+    foods.ts      Built-in food database
+    dates.ts, format.ts, types.ts
+```
+
+## Tech notes
+
+- Expo SDK 57, expo-router, TypeScript.
+- No UI libraries — hand-rolled themed components (light/dark).
+- Photo analysis prompts the model to return strict JSON, which is parsed defensively and clamped to sane ranges.

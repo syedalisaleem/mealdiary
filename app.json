@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "3",
-    "slug": "3",
+    "name": "MealDiary",
+    "slug": "mealdiary",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "3",
+    "scheme": "mealdiary",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"
@@ -32,10 +32,17 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "MealDiary uses your photo library so you can log meals from photos.",
+          "cameraPermission": "MealDiary uses the camera to take photos of your meals for calorie estimates."
+        }
       ]
     ],
     "experiments": {
-      "typedRoutes": true,
       "reactCompiler": true
     }
   }
