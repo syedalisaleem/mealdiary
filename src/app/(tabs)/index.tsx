@@ -108,7 +108,7 @@ export default function TodayScreen() {
           ))
         )}
 
-        {!ready && (
+        {ready && !goals && (
           <Pressable style={styles.settingsHint} onPress={() => router.push('/(tabs)/settings')}>
             <Text style={{ color: colors.faint }}>Set up goals →</Text>
           </Pressable>

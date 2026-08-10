@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { Directory, Paths } from 'expo-file-system';
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
@@ -78,12 +79,24 @@ export async function addEntry(entry: Entry): Promise<void> {
 export async function updateEntry(entry: Entry): Promise<void> {
   const d = await getDiary();
   const arr = d[entry.dateKey];
-  if (arr) {
-    const i = arr.findIndex((x) => x.id === entry.id);
-    if (i >= 0) arr[i] = entry;
-    await writeJson(K.diary, d);
-    emit();
+  const i = arr ? arr.findIndex((x) => x.id === entry.id) : -1;
+  if (i >= 0) {
+    arr[i] = entry;
+  } else {
+    (d[entry.dateKey] ??= []).push(entry);
+    for (const k of Object.keys(d)) {
+      if (k === entry.dateKey) continue;
+      const other = d[k];
+      if (!other) continue;
+      const j = other.findIndex((x) => x.id === entry.id);
+      if (j >= 0) {
+        other.splice(j, 1);
+        if (other.length === 0) delete d[k];
+      }
+    }
   }
+  await writeJson(K.diary, d);
+  emit();
 }
 
 export async function removeEntry(id: string, dateKey: string): Promise<void> {
@@ -174,7 +187,11 @@ export async function wipeAllData(): Promise<void> {
     // ignore
   }
   try {
-    if (Platform.OS !== 'web') await SecureStore.deleteItemAsync(K.aiKey);
+    if (Platform.OS !== 'web') {
+      await SecureStore.deleteItemAsync(K.aiKey);
+      const dir = new Directory(Paths.document, 'mealphotos');
+      if (dir.exists) dir.delete();
+    }
   } catch {
     // ignore
   }

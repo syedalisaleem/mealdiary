@@ -169,11 +169,16 @@ export async function analyzeFoodPhoto(
 
 export async function testAiConnection(cfg: AIConfig, apiKey: string): Promise<string> {
   const t0 = Date.now();
-  await analyzeFoodPhoto(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-    'image/png',
-    cfg,
-    apiKey
-  );
+  try {
+    await analyzeFoodPhoto(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'image/png',
+      cfg,
+      apiKey
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg !== 'NOT_FOOD') throw e;
+  }
   return `Connected in ${Math.max(1, Math.round((Date.now() - t0) / 1000))}s (model: ${cfg.model.trim() || (cfg.provider === 'gemini' ? PROVIDER_DEFAULTS.gemini.model : PROVIDER_DEFAULTS.openai.model)})`;
 }

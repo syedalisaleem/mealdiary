@@ -47,7 +47,14 @@ export default function ScanScreen() {
       const src = new File(asset.uri);
       const base64 = await src.base64();
       if (!base64) throw new Error('Could not read the image.');
-      const mime = src.extension?.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+      const ext = (src.extension ?? '').replace(/^\./, '').toLowerCase();
+      const mime =
+        asset.mimeType ??
+        (ext === 'png'
+          ? 'image/png'
+          : ext === 'heic' || ext === 'heif'
+            ? 'image/heic'
+            : 'image/jpeg');
       setPhoto({ uri: asset.uri, base64, mime });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load the photo.');
