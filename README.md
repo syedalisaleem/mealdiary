@@ -61,6 +61,6 @@ src/
 
 ## Tech notes
 
-- Expo SDK 57, expo-router, TypeScript.
+- Expo SDK 54, expo-router, TypeScript. **Pinned to SDK 54 on purpose:** as of August 2026 the App Store / Play Store versions of Expo Go still only support SDK 54 (store Expo Go 54.0.8 — Expo's store approval for newer SDKs is still pending), so SDK 54 is the newest version that runs in a store-installed Expo Go. When stores catch up, upgrade with `npx expo install expo@latest --fix`.
 - No UI libraries — hand-rolled themed components (light/dark).
 - Photo analysis prompts the model to return strict JSON, which is parsed defensively and clamped to sane ranges.
