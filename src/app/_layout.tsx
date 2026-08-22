@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+import { ActivityIndicator, useColorScheme, View } from 'react-native';
 
 import { initSubscriptions } from '@/lib/subscriptions';
 import { ThemeProvider, themes } from '@/theme';
@@ -10,9 +12,21 @@ export default function RootLayout() {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
 
+  const [fontsLoaded] = useFonts({
+    ...Ionicons.font,
+  });
+
   useEffect(() => {
     initSubscriptions();
   }, []);
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: themes[isDark ? 'dark' : 'light'].bg }}>
+        <ActivityIndicator size="large" color={themes[isDark ? 'dark' : 'light'].accent} />
+      </View>
+    );
+  }
 
   return (
     <ThemeProvider>

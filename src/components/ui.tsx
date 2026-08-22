@@ -139,7 +139,7 @@ export function Btn({
   const isGhost = variant === 'ghost';
   const isDanger = variant === 'danger';
   const isSecondary = variant === 'secondary';
-  const bg = variant === 'primary' ? colors.accent : isSoft ? colors.accentSoft : isDanger ? colors.dangerSoft : 'transparent';
+  const bg = variant === 'primary' ? colors.accent : isSoft ? colors.accentSoft : isDanger ? colors.dangerSoft : isSecondary ? colors.input : 'transparent';
   const fg =
     variant === 'primary'
       ? colors.accentText

@@ -121,7 +121,7 @@ export default function TodayScreen() {
             <CalorieRing
               pct={over ? 1 : kcalPct}
               color={over ? colors.danger : colors.accent}
-              trackColor={colors.input}
+              trackColor={colors.border}
             >
               <Text style={[styles.calValue, { color: over ? colors.danger : colors.text }]}>
                 {fmt(totals.calories)}
