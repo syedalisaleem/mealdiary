@@ -11,10 +11,11 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.syedalisaleem.mealdiary",
+      "versionCode": 6,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FCFCFC",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
@@ -28,9 +29,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#FFFFFF",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 180
         }
       ],
       "expo-secure-store",
@@ -38,12 +39,35 @@
         "expo-image-picker",
         {
           "photosPermission": "MealDiary uses your photo library so you can log meals from photos.",
-          "cameraPermission": "MealDiary uses the camera to take photos of your meals for calorie estimates."
+          "cameraPermission": "MealDiary uses the camera to take photos of your meals for calorie estimates.",
+          "microphonePermission": false
         }
-      ]
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-7129470803481646~7143090431"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "kotlinVersion": "2.2.20"
+          }
+        }
+      ],
+      "expo-font"
     ],
     "experiments": {
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b07fc3a9-c356-4507-99b9-daeb9c5fff2c"
+      }
     }
   }
 }

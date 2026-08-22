@@ -2,11 +2,11 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Btn, Card, Field, HeaderBar, Screen, Seg } from '@/components/ui';
+import { Btn, Card, Field, HeaderBar, Icon, Screen, Seg } from '@/components/ui';
 import { addDaysKey, dayLabel, todayKey } from '@/lib/dates';
 import { addEntry, getDiary, newEntryId, removeEntry, updateEntry } from '@/lib/storage';
-import { Entry, MEAL_LABEL, MEAL_ORDER, MealType } from '@/lib/types';
-import { useTheme } from '@/theme';
+import { Entry, MEAL_ICON, MEAL_LABEL, MEAL_ORDER, MealType } from '@/lib/types';
+import { font, radius, space, useTheme } from '@/theme';
 
 interface Prefill {
   name?: string;
@@ -118,24 +118,33 @@ export default function EntryEditScreen() {
       <HeaderBar
         title={mode === 'edit' ? 'Edit entry' : 'New entry'}
         onClose={() => router.back()}
-        right={mode === 'edit' ? <Text onPress={confirmDelete} style={{ color: colors.danger, fontWeight: '700' }}>Delete</Text> : undefined}
+        right={
+          mode === 'edit' ? (
+            <Pressable onPress={confirmDelete} hitSlop={10} style={({ pressed }) => pressed && { opacity: 0.5 }}>
+              <Icon name="trash-outline" size={20} color={colors.danger} />
+            </Pressable>
+          ) : undefined
+        }
       />
-      <Screen>
+      <Screen avoidKeyboard>
         {!loaded ? null : (
           <>
             {photoUri ? (
               <Image source={{ uri: photoUri }} style={styles.photo} />
             ) : (
-              <View style={[styles.photoPlaceholder, { backgroundColor: colors.input }]}>
-                <Text style={styles.photoIcon}>🍽️</Text>
+              <View style={[styles.photoPlaceholder, { backgroundColor: colors.input, borderColor: colors.border }]}>
+                <Icon name="image-outline" size={40} color={colors.faint} />
               </View>
             )}
 
             {source === 'ai' && (
-              <Card style={styles.aiBadge}>
-                <Text style={{ fontSize: 12.5, color: colors.sub }}>
-                  🤖 Estimate from photo — adjust anything that looks wrong.
-                </Text>
+              <Card padding="sm" style={[styles.aiBadge, { backgroundColor: colors.accentSoft, borderColor: 'transparent' }]}>
+                <View style={styles.aiBadgeRow}>
+                  <Icon name="sparkles" size={16} color={colors.accent} />
+                  <Text style={{ fontSize: 12.5, color: colors.accent, fontWeight: '600' }}>
+                    Estimate from photo — adjust anything that looks wrong.
+                  </Text>
+                </View>
               </Card>
             )}
 
@@ -144,6 +153,7 @@ export default function EntryEditScreen() {
               options={MEAL_ORDER.map((m) => ({ label: MEAL_LABEL[m], value: m }))}
               value={mealType}
               onChange={(v) => setMealType(v as MealType)}
+              iconFor={(v) => MEAL_ICON[v as MealType]}
             />
 
             <Field label="Food name" value={name} onChange={setName} placeholder="e.g. Chicken rice bowl" />
@@ -161,17 +171,29 @@ export default function EntryEditScreen() {
             <View style={styles.dayRow}>
               <Text style={[styles.fieldLabel, { color: colors.sub }]}>Day</Text>
               <View style={styles.dayStepper}>
-                <Pressable onPress={() => setDateKey((k) => addDaysKey(k, -1))} hitSlop={8} style={[styles.dayBtn, { backgroundColor: colors.input }]}>
-                  <Text style={{ color: colors.text, fontWeight: '700', fontSize: 15 }}>◀</Text>
+                <Pressable
+                  onPress={() => setDateKey((k) => addDaysKey(k, -1))}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.dayBtn, { backgroundColor: colors.input }, pressed && { opacity: 0.6 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Previous day"
+                >
+                  <Icon name="chevron-back" size={16} color={colors.text} />
                 </Pressable>
                 <Text style={[styles.dayLabel, { color: colors.text }]}>{dayLabel(dateKey)}</Text>
-                <Pressable onPress={() => setDateKey((k) => addDaysKey(k, 1))} hitSlop={8} style={[styles.dayBtn, { backgroundColor: colors.input }]}>
-                  <Text style={{ color: colors.text, fontWeight: '700', fontSize: 15 }}>▶</Text>
+                <Pressable
+                  onPress={() => setDateKey((k) => addDaysKey(k, 1))}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.dayBtn, { backgroundColor: colors.input }, pressed && { opacity: 0.6 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Next day"
+                >
+                  <Icon name="chevron-forward" size={16} color={colors.text} />
                 </Pressable>
               </View>
             </View>
 
-            <Btn label={mode === 'edit' ? 'Save changes' : 'Add to log'} onPress={save} disabled={!canSave} />
+            <Btn label={mode === 'edit' ? 'Save changes' : 'Add to log'} icon="checkmark" onPress={save} disabled={!canSave} />
             {!canSave && <Text style={[styles.saveHint, { color: colors.faint }]}>Enter a name and calories to save.</Text>}
           </>
         )}
@@ -181,15 +203,22 @@ export default function EntryEditScreen() {
 }
 
 const styles = StyleSheet.create({
-  photo: { width: '100%', aspectRatio: 1, borderRadius: 16 },
-  photoPlaceholder: { width: '100%', aspectRatio: 1, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  photoIcon: { fontSize: 48, opacity: 0.4 },
-  aiBadge: { padding: 10, borderRadius: 12 },
-  fieldLabel: { fontSize: 13, fontWeight: '600' },
-  row2: { flexDirection: 'row', gap: 10 },
+  photo: { width: '100%', aspectRatio: 1, borderRadius: radius.xl },
+  photoPlaceholder: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: radius.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  aiBadge: { padding: space.md, borderRadius: radius.md },
+  aiBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  fieldLabel: { fontSize: font.sub, fontWeight: '600' },
+  row2: { flexDirection: 'row', gap: space.sm },
   dayRow: { gap: 6 },
-  dayStepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  dayBtn: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  dayLabel: { flex: 1, textAlign: 'center', fontSize: 15, fontWeight: '700' },
+  dayStepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
+  dayBtn: { width: 40, height: 40, borderRadius: radius.sm, alignItems: 'center', justifyContent: 'center' },
+  dayLabel: { flex: 1, textAlign: 'center', fontSize: font.body, fontWeight: '700' },
   saveHint: { textAlign: 'center', fontSize: 12.5 },
 });

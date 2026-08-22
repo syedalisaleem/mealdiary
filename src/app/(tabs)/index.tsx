@@ -2,12 +2,92 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Btn, Card, EmptyState, EntryRow, Header, MacroBar, Screen, SectionTitle } from '@/components/ui';
+import { MealDiaryBanner } from '@/lib/ads';
 import { dayLabel, mealTypeForTime, todayKey } from '@/lib/dates';
 import { fmt } from '@/lib/format';
 import { computeTargets, sortedMealSections, sumEntries } from '@/lib/nutrition';
 import { MEAL_ICON } from '@/lib/types';
 import { useAppData } from '@/lib/storage';
-import { useTheme } from '@/theme';
+import { font, radius, space, useTheme } from '@/theme';
+
+function CalorieRing({
+  pct,
+  color,
+  trackColor,
+  size = 168,
+  stroke = 13,
+  children,
+}: {
+  pct: number;
+  color: string;
+  trackColor: string;
+  size?: number;
+  stroke?: number;
+  children: React.ReactNode;
+}) {
+  const r = size / 2;
+  const deg = Math.max(0, Math.min(1, pct)) * 360;
+  // Each half-mask reveals a semicircle of the ring. Inside it, a full circle
+  // whose colored border is a 90° arc is rotated around the ring centre so the
+  // visible coloured arc sweeps clockwise from 12 o'clock.
+  //   right bar: borderTop+borderRight, rotate = deg - 135 (deg in [0,180])
+  //   left bar:  borderTop+borderLeft,  rotate = (deg|180) - 45 (deg in [180,360])
+  const rightRotate = Math.min(deg, 180) - 135;
+  const leftRotate = (deg > 180 ? deg : 180) - 45;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: size,
+          height: size,
+          borderRadius: r,
+          borderWidth: stroke,
+          borderColor: trackColor,
+        }}
+      />
+      <View style={{ position: 'absolute', top: 0, left: r, width: r, height: size, overflow: 'hidden' }}>
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: -r,
+            width: size,
+            height: size,
+            borderRadius: r,
+            borderWidth: stroke,
+            borderTopColor: color,
+            borderRightColor: color,
+            borderBottomColor: 'transparent',
+            borderLeftColor: 'transparent',
+            transform: [{ rotate: `${rightRotate}deg` }],
+          }}
+        />
+      </View>
+      <View style={{ position: 'absolute', top: 0, left: 0, width: r, height: size, overflow: 'hidden' }}>
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: size,
+            height: size,
+            borderRadius: r,
+            borderWidth: stroke,
+            borderTopColor: color,
+            borderLeftColor: color,
+            borderBottomColor: 'transparent',
+            borderRightColor: 'transparent',
+            transform: [{ rotate: `${leftRotate}deg` }],
+          }}
+        />
+      </View>
+      <View style={{ alignItems: 'center', gap: 2 }}>{children}</View>
+    </View>
+  );
+}
 
 export default function TodayScreen() {
   const { colors } = useTheme();
@@ -36,28 +116,37 @@ export default function TodayScreen() {
           {!ready && <Text style={[styles.subHeaderLoading, { color: colors.faint }]}>Loading…</Text>}
         </View>
 
-        <Card>
-          <View style={styles.calRow}>
-            <View style={styles.calMain}>
+        <Card style={styles.heroCard}>
+          <View style={styles.heroTop}>
+            <CalorieRing
+              pct={over ? 1 : kcalPct}
+              color={over ? colors.danger : colors.accent}
+              trackColor={colors.input}
+            >
               <Text style={[styles.calValue, { color: over ? colors.danger : colors.text }]}>
                 {fmt(totals.calories)}
               </Text>
-              <Text style={[styles.calUnit, { color: colors.faint }]}>kcal eaten · target {fmt(targets.calories)}</Text>
-            </View>
-            <View style={styles.calRemaining}>
-              <Text style={[styles.calRemainingValue, { color: over ? colors.danger : colors.success }]}>
-                {over ? 'Over by' : `${fmt(remaining)} left`}
-              </Text>
-            </View>
+              <Text style={[styles.calUnit, { color: colors.faint }]}>kcal</Text>
+              <View
+                style={[
+                  styles.calRemainingPill,
+                  { backgroundColor: over ? colors.dangerSoft : colors.accentSoft },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.calRemainingValue,
+                    { color: over ? colors.danger : colors.accent },
+                  ]}
+                >
+                  {over ? `Over ${fmt(totals.calories - targets.calories)}` : `${fmt(remaining)} left`}
+                </Text>
+              </View>
+            </CalorieRing>
           </View>
-          <View style={[styles.bigTrack, { backgroundColor: colors.input }]}>
-            <View
-              style={[
-                styles.bigFill,
-                { backgroundColor: over ? colors.danger : colors.success, width: `${kcalPct * 100}%` },
-              ]}
-            />
-          </View>
+          <Text style={[styles.calTarget, { color: colors.sub }]}>
+            Daily target {fmt(targets.calories)} kcal
+          </Text>
           <View style={styles.macros}>
             <MacroBar label="Protein" value={totals.protein} target={targets.protein} color={colors.protein} />
             <MacroBar label="Carbs" value={totals.carbs} target={targets.carbs} color={colors.carbs} />
@@ -69,9 +158,15 @@ export default function TodayScreen() {
         </Card>
 
         <View style={styles.actions}>
-          <Btn label="📷 Scan a meal" onPress={() => router.push('/scan')} style={{ flex: 1 }} />
           <Btn
-            label="➕ Add food"
+            label="Scan a meal"
+            icon="camera-outline"
+            onPress={() => router.push('/scan')}
+            style={{ flex: 1 }}
+          />
+          <Btn
+            label="Add food"
+            icon="add"
             variant="secondary"
             onPress={() => router.push({ pathname: '/add', params: { mealType: defaultMeal } })}
             style={{ flex: 1 }}
@@ -80,14 +175,16 @@ export default function TodayScreen() {
 
         {sections.length === 0 ? (
           <Card>
-            <EmptyState icon="🥗" text="No meals logged yet. Scan a photo or add food manually." />
+            <EmptyState
+              icon="restaurant-outline"
+              text="Nothing logged yet today"
+              sub="Scan a photo of a meal or add it manually."
+            />
           </Card>
         ) : (
           sections.map((s) => (
             <View key={s.meal} style={styles.section}>
-              <SectionTitle>
-                {MEAL_ICON[s.meal]} {s.label}
-              </SectionTitle>
+              <SectionTitle>{s.label}</SectionTitle>
               <Card style={styles.entryCard}>
                 {s.entries.map((e) => (
                   <EntryRow
@@ -109,10 +206,14 @@ export default function TodayScreen() {
         )}
 
         {ready && !goals && (
-          <Pressable style={styles.settingsHint} onPress={() => router.push('/(tabs)/settings')}>
-            <Text style={{ color: colors.faint }}>Set up goals →</Text>
+          <Pressable
+            style={({ pressed }) => [styles.settingsHint, pressed && { opacity: 0.6 }]}
+            onPress={() => router.push('/(tabs)/settings')}
+          >
+            <Text style={{ color: colors.faint, fontWeight: '600' }}>Set up your goals →</Text>
           </Pressable>
         )}
+        <MealDiaryBanner />
       </Screen>
     </View>
   );
@@ -122,18 +223,17 @@ const styles = StyleSheet.create({
   subHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: -4 },
   subHeaderDate: { fontSize: 14, fontWeight: '600' },
   subHeaderLoading: { fontSize: 12 },
-  calRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
-  calMain: { gap: 2 },
-  calValue: { fontSize: 44, fontWeight: '800', letterSpacing: -1 },
-  calUnit: { fontSize: 12.5, fontWeight: '600' },
-  calRemaining: { marginBottom: 6 },
-  calRemainingValue: { fontSize: 14, fontWeight: '800' },
-  bigTrack: { height: 12, borderRadius: 6, overflow: 'hidden' },
-  bigFill: { height: 12, borderRadius: 6 },
-  macros: { gap: 10 },
-  goalNote: { fontSize: 11.5 },
-  actions: { flexDirection: 'row', gap: 10 },
-  section: { gap: 8 },
-  entryCard: { paddingVertical: 6, paddingHorizontal: 14 },
-  settingsHint: { alignItems: 'center', paddingVertical: 8 },
+  heroCard: { alignItems: 'center', gap: space.md, paddingVertical: space.xl },
+  heroTop: { alignItems: 'center' },
+  calValue: { fontSize: font.display, fontWeight: '800', letterSpacing: -1.5, fontVariant: ['tabular-nums'] },
+  calUnit: { fontSize: 15, fontWeight: '700' },
+  calRemainingPill: { borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 7, marginTop: 6 },
+  calRemainingValue: { fontSize: 13, fontWeight: '800' },
+  calTarget: { fontSize: font.sub, fontWeight: '500' },
+  macros: { gap: space.md, alignSelf: 'stretch' },
+  goalNote: { fontSize: font.tiny },
+  actions: { flexDirection: 'row', gap: space.sm },
+  section: { gap: space.sm },
+  entryCard: { paddingVertical: 6, paddingHorizontal: space.md },
+  settingsHint: { alignItems: 'center', paddingVertical: space.sm },
 });

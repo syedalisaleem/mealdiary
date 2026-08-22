@@ -124,10 +124,16 @@ export const FOODS: FoodItem[] = [
   { name: 'Red wine', serving: '5 oz', calories: 125, protein: 0.1, carbs: 3.8, fat: 0 },
 ];
 
+const FOOD_NAMES_LC: string[] = FOODS.map((f) => f.name.toLowerCase());
+
 export function searchFoods(query: string, limit = 30): FoodItem[] {
   const q = query.trim().toLowerCase();
   if (!q) return FOODS.slice(0, 12);
-  const starts = FOODS.filter((f) => f.name.toLowerCase().startsWith(q));
-  const contains = FOODS.filter((f) => !f.name.toLowerCase().startsWith(q) && f.name.toLowerCase().includes(q));
+  const starts: FoodItem[] = [];
+  const contains: FoodItem[] = [];
+  for (let i = 0; i < FOODS.length; i++) {
+    if (FOOD_NAMES_LC[i]!.startsWith(q)) starts.push(FOODS[i]!);
+    else if (FOOD_NAMES_LC[i]!.includes(q)) contains.push(FOODS[i]!);
+  }
   return [...starts, ...contains].slice(0, limit);
 }

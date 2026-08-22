@@ -1,3 +1,5 @@
+import type { IconName } from '@/components/ui';
+
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 
 export const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -9,11 +11,11 @@ export const MEAL_LABEL: Record<MealType, string> = {
   snack: 'Snacks',
 };
 
-export const MEAL_ICON: Record<MealType, string> = {
-  breakfast: '🍳',
-  lunch: '🥗',
-  dinner: '🍛',
-  snack: '🍪',
+export const MEAL_ICON: Record<MealType, IconName> = {
+  breakfast: 'cafe-outline',
+  lunch: 'restaurant-outline',
+  dinner: 'moon-outline',
+  snack: 'ice-cream-outline',
 };
 
 export interface Entry {

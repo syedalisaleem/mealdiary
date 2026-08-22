@@ -6,6 +6,8 @@ import { Platform } from 'react-native';
 
 import { AIConfig, Diary, Entry, Goals, Profile } from './types';
 import { computeTargets } from './nutrition';
+import { clearCreditCache } from './credits';
+import { clearDevTierCache } from './subscriptions';
 
 const K = {
   diary: 'mealdiary/diary/v1',
@@ -33,6 +35,12 @@ export const DEFAULT_AI_CONFIG: AIConfig = {
 
 let diaryCache: Diary | null = null;
 let loaded = false;
+let profileCache: Profile | null = null;
+let goalsCache: Goals | null | undefined = undefined;
+let aiConfigCache: AIConfig | null = null;
+let apiKeyCache: string | null = null;
+let apiKeyLoaded = false;
+
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -117,19 +125,25 @@ export function newEntryId(): string {
 // ---- profile & goals ----
 
 export async function loadProfile(): Promise<Profile> {
-  return readJson<Profile>(K.profile, DEFAULT_PROFILE);
+  if (profileCache) return profileCache;
+  profileCache = await readJson<Profile>(K.profile, DEFAULT_PROFILE);
+  return profileCache;
 }
 
 export async function saveProfile(p: Profile): Promise<void> {
+  profileCache = p;
   await writeJson(K.profile, p);
   emit();
 }
 
 export async function loadGoals(): Promise<Goals | null> {
-  return readJson<Goals | null>(K.goals, null);
+  if (goalsCache !== undefined) return goalsCache;
+  goalsCache = await readJson<Goals | null>(K.goals, null);
+  return goalsCache;
 }
 
 export async function saveGoals(g: Goals | null): Promise<void> {
+  goalsCache = g;
   await writeJson(K.goals, g);
   emit();
 }
@@ -141,32 +155,51 @@ export async function effectiveGoals(profile: Profile, goals: Goals | null): Pro
 // ---- AI settings ----
 
 export async function loadAIConfig(): Promise<AIConfig> {
-  return readJson<AIConfig>(K.aiconfig, DEFAULT_AI_CONFIG);
+  if (aiConfigCache) return aiConfigCache;
+  aiConfigCache = await readJson<AIConfig>(K.aiconfig, DEFAULT_AI_CONFIG);
+  return aiConfigCache;
 }
 
 export async function saveAIConfig(cfg: AIConfig): Promise<void> {
+  aiConfigCache = cfg;
   await writeJson(K.aiconfig, cfg);
   emit();
 }
 
 export async function getApiKey(): Promise<string> {
+  if (apiKeyLoaded) return apiKeyCache ?? '';
+  apiKeyLoaded = true;
   if (Platform.OS === 'web') {
-    return (await readJson<string | null>(K.aiKeyFallback, null)) ?? '';
+    apiKeyCache = (await readJson<string | null>(K.aiKeyFallback, null)) ?? '';
+    return apiKeyCache;
   }
   try {
-    return (await SecureStore.getItemAsync(K.aiKey)) ?? '';
+    const v = await SecureStore.getItemAsync(K.aiKey);
+    if (v) {
+      apiKeyCache = v;
+      return v;
+    }
   } catch {
-    return '';
+    // ignore
   }
+  apiKeyCache = (await readJson<string | null>(K.aiKeyFallback, null)) ?? '';
+  return apiKeyCache;
 }
 
 export async function setApiKey(key: string): Promise<void> {
+  apiKeyCache = key;
+  apiKeyLoaded = true;
   if (Platform.OS === 'web') {
     await writeJson(K.aiKeyFallback, key || null);
   } else {
     try {
-      if (key) await SecureStore.setItemAsync(K.aiKey, key);
-      else await SecureStore.deleteItemAsync(K.aiKey);
+      if (key) {
+        await SecureStore.setItemAsync(K.aiKey, key);
+        await AsyncStorage.removeItem(K.aiKeyFallback);
+      } else {
+        await SecureStore.deleteItemAsync(K.aiKey);
+        await AsyncStorage.removeItem(K.aiKeyFallback);
+      }
     } catch {
       await writeJson(K.aiKeyFallback, key || null);
     }
@@ -182,7 +215,15 @@ export async function hasApiKey(): Promise<boolean> {
 
 export async function wipeAllData(): Promise<void> {
   try {
-    await AsyncStorage.multiRemove([K.diary, K.profile, K.goals, K.aiconfig, K.aiKeyFallback]);
+    await AsyncStorage.multiRemove([
+      K.diary,
+      K.profile,
+      K.goals,
+      K.aiconfig,
+      K.aiKeyFallback,
+      'mealdiary/scan-credits/v2',
+      'mealdiary/dev-tier/v1',
+    ]);
   } catch {
     // ignore
   }
@@ -197,6 +238,13 @@ export async function wipeAllData(): Promise<void> {
   }
   diaryCache = null;
   loaded = false;
+  profileCache = null;
+  goalsCache = undefined;
+  aiConfigCache = null;
+  apiKeyCache = null;
+  apiKeyLoaded = false;
+  clearCreditCache();
+  clearDevTierCache();
   emit();
 }
 
@@ -223,15 +271,31 @@ export function useAppData(): AppData {
 
   useEffect(() => {
     let alive = true;
+    let inflight = false;
+    let queued = false;
+
     async function reload() {
-      const [diary, profile, goals, aiConfig, apiKey] = await Promise.all([
-        getDiary(),
-        loadProfile(),
-        loadGoals(),
-        loadAIConfig(),
-        getApiKey(),
-      ]);
-      if (alive) setData({ diary, profile, goals, aiConfig, apiKey, ready: true });
+      if (!alive) return;
+      if (inflight) {
+        queued = true;
+        return;
+      }
+      inflight = true;
+      try {
+        do {
+          queued = false;
+          const [diary, profile, goals, aiConfig, apiKey] = await Promise.all([
+            getDiary(),
+            loadProfile(),
+            loadGoals(),
+            loadAIConfig(),
+            getApiKey(),
+          ]);
+          if (alive) setData({ diary, profile, goals, aiConfig, apiKey, ready: true });
+        } while (queued && alive);
+      } finally {
+        inflight = false;
+      }
     }
     reload();
     const un = subscribe(reload);

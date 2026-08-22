@@ -1,28 +1,11 @@
-import { AIConfig, FoodEstimate } from './types';
+import { FoodEstimate } from './types';
 
-export const PROVIDER_DEFAULTS: Record<
-  AIConfig['provider'],
-  { label: string; baseUrl: string; model: string; keyHint: string }
-> = {
-  openai: {
-    label: 'OpenAI',
-    baseUrl: 'https://api.openai.com/v1',
-    model: 'gpt-4o-mini',
-    keyHint: 'sk-...',
-  },
-  custom: {
-    label: 'Custom (OpenAI-compatible)',
-    baseUrl: 'https://api.openai.com/v1',
-    model: 'gpt-4o-mini',
-    keyHint: 'your key',
-  },
-  gemini: {
-    label: 'Google Gemini',
-    baseUrl: 'https://generativelanguage.googleapis.com',
-    model: 'gemini-2.5-flash',
-    keyHint: 'AIza...',
-  },
-};
+// The key lives on the Cloudflare worker (secret GEMINI_API_KEY) — never ship it in the app.
+// Local dev fallback: uncomment GEMINI_API_KEY and empty GEMINI_PROXY_URL to call Gemini directly.
+export const GEMINI_API_KEY = '';
+export const GEMINI_PROXY_URL = 'https://mealdiary-proxy.12next-gaming12.workers.dev';
+export const GEMINI_MODEL = 'gemini-3.5-flash';
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com';
 
 const SYSTEM_PROMPT = `You are a nutritionist analyzing a photo of a meal. Estimate the calories and macronutrients for the photographed portion as served.
 Reply with ONLY a JSON object, no markdown, no extra text, using exactly this schema:
@@ -39,10 +22,30 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 
 function extractJson(text: string): unknown {
   const cleaned = text.replace(/```(?:json)?/gi, '').trim();
-  const start = cleaned.indexOf('{');
-  const end = cleaned.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) throw new Error('No JSON found in response');
-  return JSON.parse(cleaned.slice(start, end + 1));
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // not clean JSON — fall back to scanning for a balanced object
+  }
+  const stack: number[] = [];
+  let lastValid: unknown = undefined;
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i];
+    if (ch === '{') {
+      stack.push(i);
+    } else if (ch === '}' && stack.length > 0) {
+      const start = stack.pop()!;
+      if (stack.length === 0) {
+        try {
+          lastValid = JSON.parse(cleaned.slice(start, i + 1));
+        } catch {
+          // keep scanning for a balanced object that does parse
+        }
+      }
+    }
+  }
+  if (lastValid === undefined) throw new Error('No JSON found in response');
+  return lastValid;
 }
 
 function toNumber(v: unknown, fallback = 0): number {
@@ -95,90 +98,35 @@ async function postJson(url: string, body: unknown, headers: Record<string, stri
   }
 }
 
-export async function analyzeFoodPhoto(
-  base64: string,
-  mime: string,
-  cfg: AIConfig,
-  apiKey: string
-): Promise<FoodEstimate> {
-  if (!apiKey.trim()) throw new Error('NO_KEY');
-
-  const dataUrl = `data:${mime};base64,${base64}`;
-  const userContent: { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } } = {
-    type: 'image_url',
-    image_url: { url: dataUrl },
+export async function analyzeFoodPhoto(base64: string, mime: string): Promise<FoodEstimate> {
+  const useProxy = GEMINI_PROXY_URL.length > 0;
+  const url = useProxy
+    ? `${GEMINI_PROXY_URL}`
+    : `${GEMINI_BASE}/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+  const text = await postJson(
+    url,
+    {
+      contents: [
+        {
+          parts: [
+            { text: SYSTEM_PROMPT },
+            { inline_data: { mime_type: mime, data: base64 } },
+          ],
+        },
+      ],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+    },
+    {}
+  );
+  const j = JSON.parse(text) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
   };
-
-  let estimate: FoodEstimate;
-
-  if (cfg.provider === 'gemini') {
-    const base = PROVIDER_DEFAULTS.gemini.baseUrl.replace(/\/$/, '');
-    const model = cfg.model.trim() || PROVIDER_DEFAULTS.gemini.model;
-    const url = `${base}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
-    const text = await postJson(
-      url,
-      {
-        contents: [
-          {
-            parts: [
-              { text: SYSTEM_PROMPT },
-              { inline_data: { mime_type: mime, data: base64 } },
-            ],
-          },
-        ],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 300 },
-      },
-      {}
-    );
-    const j = JSON.parse(text) as {
-      candidates?: { content?: { parts?: { text?: string }[] } }[];
-    };
-    const part = j.candidates?.[0]?.content?.parts?.find((p) => p.text);
-    if (!part?.text) throw new Error('Empty response from Gemini');
-    estimate = parseEstimate(part.text);
-  } else {
-    const base = (cfg.baseUrl || PROVIDER_DEFAULTS.openai.baseUrl).replace(/\/$/, '');
-    const model = cfg.model.trim() || PROVIDER_DEFAULTS.openai.model;
-    const text = await postJson(
-      `${base}/chat/completions`,
-      {
-        model,
-        temperature: 0.2,
-        max_tokens: 300,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: [{ type: 'text', text: 'Estimate this meal.' }, userContent] },
-        ],
-      },
-      { Authorization: `Bearer ${apiKey.trim()}` }
-    );
-    const j = JSON.parse(text) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const content = j.choices?.[0]?.message?.content;
-    if (!content) throw new Error('Empty response from AI service');
-    estimate = parseEstimate(content);
-  }
-
+  const parts = (j.candidates?.[0]?.content?.parts ?? []).map((p) => p.text?.trim() ?? '').filter(Boolean);
+  const joined = parts.join('\n');
+  if (!joined) throw new Error('Empty response from Gemini');
+  const estimate = parseEstimate(joined);
   if (estimate.name.toLowerCase().includes('not food')) {
     throw new Error('NOT_FOOD');
   }
   return estimate;
-}
-
-export async function testAiConnection(cfg: AIConfig, apiKey: string): Promise<string> {
-  const t0 = Date.now();
-  try {
-    await analyzeFoodPhoto(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-      'image/png',
-      cfg,
-      apiKey
-    );
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg !== 'NOT_FOOD') throw e;
-  }
-  return `Connected in ${Math.max(1, Math.round((Date.now() - t0) / 1000))}s (model: ${cfg.model.trim() || (cfg.provider === 'gemini' ? PROVIDER_DEFAULTS.gemini.model : PROVIDER_DEFAULTS.openai.model)})`;
 }
