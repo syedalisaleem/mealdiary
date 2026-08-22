@@ -1,26 +1,40 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFonts } from 'expo-font';
+import * as Font from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import { ActivityIndicator, useColorScheme, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Platform, useColorScheme, View } from 'react-native';
 
 import { initSubscriptions } from '@/lib/subscriptions';
 import { ThemeProvider, themes } from '@/theme';
 
+const IONICONS_CDN = 'https://cdn.jsdelivr.net/npm/react-native-vector-icons@10.0.0/Fonts/Ionicons.ttf';
+
+function injectIoniconsFontFace() {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  const id = 'ionicons-cdn-fontface';
+  if (document.getElementById(id)) return;
+  const style = document.createElement('style');
+  style.id = id;
+  style.textContent = `@font-face{font-family:"ionicons";src:url(${IONICONS_CDN});font-display:block}`;
+  document.head.appendChild(style);
+}
+
 export default function RootLayout() {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
-
-  const [fontsLoaded] = useFonts({
-    ...Ionicons.font,
-  });
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    initSubscriptions();
+    (async () => {
+      injectIoniconsFontFace();
+      await Font.loadAsync(Ionicons.font);
+      initSubscriptions();
+      setReady(true);
+    })();
   }, []);
 
-  if (!fontsLoaded) {
+  if (!ready) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: themes[isDark ? 'dark' : 'light'].bg }}>
         <ActivityIndicator size="large" color={themes[isDark ? 'dark' : 'light'].accent} />
