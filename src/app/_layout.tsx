@@ -12,12 +12,17 @@ const IONICONS_CDN = 'https://cdn.jsdelivr.net/npm/react-native-vector-icons@10.
 
 function injectIoniconsFontFace() {
   if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-  const id = 'ionicons-cdn-fontface';
-  if (document.getElementById(id)) return;
-  const style = document.createElement('style');
-  style.id = id;
-  style.textContent = `@font-face{font-family:"ionicons";src:url(${IONICONS_CDN});font-display:block}`;
-  document.head.appendChild(style);
+  const styleId = 'expo-generated-fonts';
+  let styleEl = document.getElementById(styleId);
+  if (!styleEl) {
+    styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    document.head.appendChild(styleEl);
+  }
+  const sheet = styleEl.sheet || (styleEl as HTMLStyleElement).styleSheet;
+  if (!sheet) return;
+  const css = `@font-face{font-family:"ionicons";src:url(${IONICONS_CDN});font-display:auto}`;
+  try { sheet.insertRule(css, sheet.cssRules.length); } catch {}
 }
 
 export default function RootLayout() {
